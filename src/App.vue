@@ -36,9 +36,11 @@ const base = {
 	},
 	notation: 'sci',
 };
+let bleh = false;
 const g = reactive(base);
 const tab = ref("dim");
 let saveloop;
+let saveinput;
 const dTime = 62.5 / 1000;
 onMounted(()=>{
 	if(!localStorage.getItem("save")){
@@ -50,7 +52,13 @@ onMounted(()=>{
 	saveloop = setInterval(saveGame, 15_000);
 	}
 );
-
+function exportSave(){
+	saveinput = btoa(JSON.stringify(g));
+}
+function importSave(){
+	localStorage.setItem("save", saveinput);
+	loadGame();
+}
 function gameTick(t=dTime){
 	g.a      = g.a     .plus(persec(0).mul(t));
 	g.ads[1] = g.ads[1].plus(persec(1).mul(t));
@@ -59,10 +67,13 @@ function gameTick(t=dTime){
 }
 function loadGame(){
 	let q = JSON.parse(atob(localStorage.getItem("save")))
+	Object.apply(g,q)
 	g.a = F(q.a);
 	g.tick = F(q.tick)
 	for (let i = 1; i <= 4; i++) g.ads[i] = F(q.ads[i]);
 	for (let i = 1; i <= 4; i++) g.adps[i] = F(q.adps[i]);
+	g.prestige.points = F(q.prestige.points)
+	g.prestige.times = F(q.prestige.times)
 	g.not = q.not;
 }
 function saveGame(){
@@ -77,6 +88,10 @@ function baseMPS(){
 	let tickmul = g.tick.mul(tickpower()).plus(2);
 	return g.ads[1].mul(tickmul.pow(g.adps[1])).div(8);
 }
+function softcapPower(){
+	if(g.prestige.upgs[6]) return E(0.45)
+	else return E(0.5)
+}
 function persec(n) {
 	let tickmul = g.tick.mul(tickpower()).plus(2);
 	let base = g.ads[n+1].mul(tickmul.pow(g.adps[n+1])).div(n===0||g.prestige.upgs[2]?1:8);
@@ -84,7 +99,7 @@ function persec(n) {
 	if(n !== 0) return base;
 	if(base.gt(1e20))
 		base = base.pow(
-			(E(20).div(base.log10())).pow(0.5)
+			(E(20).div(base.log10())).pow(softcapPower())
 		);
 	return base;
 }
@@ -93,8 +108,8 @@ function dimcost(n, q=null){
 	return g.adcms[n].pow(q).mul(g.adics[n]);
 }
 function tickpower(){
-	if(g.prestige.upgs[4]) return 0.3
-	else return 0.25
+	if(g.prestige.upgs[4]) return E(0.3)
+	else return E(0.25)
 }
 function tickcost(q=g.tick){
 	let tickscale = 1.3
@@ -126,22 +141,25 @@ function pendingPoints(){
 	if(!g.prestige.upgs[8]) return 1;
 	else return g.tick.sub(5)
 }
-function prestige(){
-	g.prestige.points = g.prestige.points.add(pendingPoints());
-	g.prestige.times = g.prestige.times.add(1);
+function prestigereset(){
 	if(g.prestige.upgs[7]) g.a = g.prestige.times.add(1).pow(2)
 	else g.a = E(1)
 	g.tick = E(0)
 	for (let i = 1; i <= 4; i++) g.ads[i] = E(0);
 	for (let i = 1; i <= 4; i++) g.adps[i] = E(0);
 }
+function prestige(){
+	g.prestige.points = g.prestige.points.add(pendingPoints());
+	g.prestige.times = g.prestige.times.add(1);
+	prestigereset();
+}
 function buyPUpgrade(n){
-	if(( g.prestige.upgs[n-2] || n <= 2 )&&
-		(!g.prestige.upgs[n])&&
-		(g.prestige.points >= Math.floor(n/2+0.5))&&
-		( n !== 8 || g.prestige.upgs.findIndex((x)=>!x) === 7)) {
+	if(( g.prestige.upgs[n-2] || n <= 2 )&& // if previous
+		(!g.prestige.upgs[n])&& // if not already bought
+		(g.prestige.points.gte(1))&& // if you have the currency
+		( n !== 8 || g.prestige.upgs[7])) { // making sure number 8
 		g.prestige.upgs[n] = true; // Trvth nvke
-		g.prestige.points = g.prestige.points.sub(Math.floor(n/2+0.5))
+		g.prestige.points = g.prestige.points.sub(1)
 	}
 }
 function scinot(x, p){
@@ -165,14 +183,12 @@ function notate(x, p=2){
 		background-color: #fff;
 		color: #000;
 	}
-	.prestige > button:not(disabled){
-		background-color: #33f;
-	}
 	table, td {
 		border: none;
 	}
 	td > button {
 		width: 100%;
+		height: 100%;
 		text-align: left;
 	}
 	.center {
@@ -205,12 +221,12 @@ function notate(x, p=2){
 			<button v-if="g.tick.gt(6)" @click='prestige' style="background-color: blue;">Prestige for {{ notate(pendingPoints()) }} point{{pendingPoints!==1?'s':''}}!</button>
 		</div>
 		<div v-if="tab==='dim'">
-			<div class="center">
+			<div class="center" v-if="g.ads[1].gt(0)">
 				<button @click="buytick" style = "background-color: #cfc;">
 					Cost: {{notate(tickcost())}}
 				</button>
 				<pre> </pre>
-				You have {{notate(g.tick)}} theorem{{ g.tick.neq(1)?'s':'' }}<span v-if="g.tick.gt(0)">, making per-purchase multipliers {{notate(g.tick.mul(0.25).plus(2), 2)}}</span>
+				You have {{notate(g.tick)}} theorem{{ g.tick.neq(1)?'s':'' }}<span v-if="g.tick.gt(0)">, making per-purchase multipliers {{notate(g.tick.mul(tickpower()).plus(2), 2)}}</span>
 			</div>
 			<br />
 			<table>
@@ -277,7 +293,7 @@ function notate(x, p=2){
 			</table>
 			<br />
 			<div v-if="baseMPS().gt(1e20)">
-				Above 1e20 manifolds per second, manifold production is raised to the power of {{ notate((E(20).div(baseMPS().log10())).pow(0.5), 4) }}
+				Above 1e20 manifolds per second, manifold production is raised to the power of {{ notate((E(20).div(baseMPS().log10())).pow(softcapPower()), 4) }}
 			</div>
 		</div>
 		<br /> 
@@ -294,13 +310,31 @@ function notate(x, p=2){
 					<tr>
 						<td>
 							<button @click="saveGame">
-								save game for debug
+								Save game
+							</button>
+						</td>
+					</tr>
+					<tr>
+						<td>
+							<button @click="exportSave">
+								Export save
+							</button>
+						</td>
+					</tr>
+					<tr>
+						<td>
+							<button @click="importSave">
+								Import save
 							</button>
 						</td>
 					</tr>
 				</table>
 				<br />
-				{{ JSON.stringify(g,1) }}
+				<textarea v-model="saveinput"></textarea>
+
+				<br />
+				<button @click="bleh = !bleh">show save or something</button>
+				<div v-if="bleh">{{ JSON.stringify(g) }}</div>
 			</div>
 		</div>
 		<br />
@@ -315,51 +349,48 @@ function notate(x, p=2){
 			<table class="prestige">
 				<tr>
 					<td>
-						<button :style='{"background-color": g.prestige.upgs[1]?"#00f":"#333"}'
+						<button :style='{"background-color": g.prestige.upgs[1]?"#33f":"#333"}'
 						@click="buyPUpgrade(1)">Upgrade 1: Double all generator mults</button>
 					</td>
 					<td>
-						<button :style='{"background-color": g.prestige.upgs[2]?"#00f":"#333"}'
+						<button :style='{"background-color": g.prestige.upgs[2]?"#33f":"#333"}'
 						@click="buyPUpgrade(2)">Upgrade 2: Remove &div;8 nerf on Lines, Planes, and Cell</button>
 					</td>
 				</tr>
 				<tr>
 					<td>
-						<button :disabled="!g.prestige.upgs[1]"
-						:style='{"background-color": g.prestige.upgs[3]?"#00f":"#333"}'
-						@click="buyPUpgrade(3)">Upgrade 3: Weaken tickspeed cost scaling (1.3 =&gt; 1.25)</button>
+						<button :style='{"background-color": g.prestige.upgs[3]?"#33f":"#333"}'
+						@click="buyPUpgrade(3)">Upgrade 3: Weaken theorem cost scaling (1.3 =&gt; 1.25)</button>
 					</td>
 					<td>
-						<button :disabled="!g.prestige.upgs[2]"
-						:style='{"background-color": g.prestige.upgs[4]?"#00f":"#333"}'
+						<button :style='{"background-color": g.prestige.upgs[4]?"#33f":"#333"}'
 						@click="buyPUpgrade(4)">Upgrade 4: Increase theorem power (0.25 =&gt; 0.3)</button>
 					</td>
 				</tr>
 				<tr>
 					<td>
-						<button :disabled="!g.prestige.upgs[3]"
-						:style='{"background-color": g.prestige.upgs[5]?"#00f":"#333"}'
-						@click="buyPUpgrade(5)">Upgrade 5: Further weaken tickspeed cost scaling (1.25 =&gt; 1.2)</button>
+						<button :style='{"background-color": g.prestige.upgs[5]?"#33f":"#333"}'
+						@click="buyPUpgrade(5)">Upgrade 5: Further weaken theorem cost scaling (1.25 =&gt; 1.2)</button>
 					</td>
 					<td>
-						<button :disabled="!g.prestige.upgs[4]"
-						:style='{"background-color": g.prestige.upgs[6]?"#00f":"#333"}'
-						@click="buyPUpgrade(6)">Upgrade 6: Weaken manifold softcap by 5% (50% =&gt; 45%)</button>
+						<button :style='{"background-color": g.prestige.upgs[6]?"#33f":"#333"}'
+						@click="buyPUpgrade(6)">Upgrade 6: Weaken manifold softcap by 5% (0.5 =&gt; 0.45)</button>
 					</td>
 				</tr>
 				<tr>
 					<td>
-						<button :disabled="!g.prestige.upgs[5]"
-						:style='{"background-color": g.prestige.upgs[7]?"#00f":"#333"}'
+						<button :style='{"background-color": g.prestige.upgs[7]?"#33f":"#333"}'
 						@click="buyPUpgrade(7)">Upgrade 7: Start with some manifolds after prestige (currently {{ g.prestige.times.add(1).pow(2) }})</button>
 					</td>
 					<td>
-						<button :disabled="!g.prestige.upgs[6] || !g.prestige.upgs[7]"
-						:style='{"background-color": g.prestige.upgs[8]?"#00f":"#333"}'
+						<button :style='{"background-color": g.prestige.upgs[8]?"#33f":"#333"}'
 						@click="buyPUpgrade(8)">Upgrade 8: You can get more than 1 prestige point per reset</button>
 					</td>
 				</tr>
 			</table>
+			<br />
+			<br />
+			<button @click="prestigereset">Force a prestige reset</button>
 		</div>
 	</div>
 </template>
