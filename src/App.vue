@@ -34,13 +34,12 @@ const base = {
 			false,false,
 		]
 	},
+	flunes: E(0),
 	notation: 'sci',
 };
-let bleh = false;
-const g = reactive(base);
+let g = reactive(base);
 const tab = ref("dim");
 let saveloop;
-let saveinput;
 const dTime = 62.5 / 1000;
 onMounted(()=>{
 	if(!localStorage.getItem("save")){
@@ -53,13 +52,21 @@ onMounted(()=>{
 	}
 );
 function exportSave(){
-	saveinput = btoa(JSON.stringify(g));
+	document.getElementById("saveworks").value = btoa(JSON.stringify(g));
 }
 function importSave(){
-	localStorage.setItem("save", saveinput);
+	localStorage.setItem("save", document.getElementById("saveworks").value);
 	loadGame();
 }
 function gameTick(t=dTime){
+	if(g.flunes.gte(1)) {
+		for(let i = 1; i <= 4; i++){
+			let bruple = g.a.log10().sub(g.adics[i].log10()).div(g.adcms[i].log10()).add(1);
+			// g.a.div(E(10).pow(2))
+			g.ads[i] = D.max(bruple, g.ads[i]);
+			g.adps[i] = D.max(bruple, g.adps[i]);
+		}
+	}
 	g.a      = g.a     .plus(persec(0).mul(t));
 	g.ads[1] = g.ads[1].plus(persec(1).mul(t));
 	g.ads[2] = g.ads[2].plus(persec(2).mul(t));
@@ -67,14 +74,15 @@ function gameTick(t=dTime){
 }
 function loadGame(){
 	let q = JSON.parse(atob(localStorage.getItem("save")))
-	Object.apply(g,q)
 	g.a = F(q.a);
 	g.tick = F(q.tick)
 	for (let i = 1; i <= 4; i++) g.ads[i] = F(q.ads[i]);
 	for (let i = 1; i <= 4; i++) g.adps[i] = F(q.adps[i]);
 	g.prestige.points = F(q.prestige.points)
 	g.prestige.times = F(q.prestige.times)
+	g.prestige.upgs = q.prestige.upgs
 	g.not = q.not;
+	g.flunes = F(q.flunes);
 }
 function saveGame(){
 	localStorage.setItem("save", btoa(JSON.stringify(g)));
@@ -88,7 +96,11 @@ function baseMPS(){
 	let tickmul = g.tick.mul(tickpower()).plus(2);
 	return g.ads[1].mul(tickmul.pow(g.adps[1])).div(8);
 }
+function softcapStart(){
+	return g.flunes.add(20);
+}
 function softcapPower(){
+	if(g.flunes.gt(0)) return E(0.8).pow(g.flunes).mul(0.25).add(0.2);
 	if(g.prestige.upgs[6]) return E(0.45)
 	else return E(0.5)
 }
@@ -97,27 +109,32 @@ function persec(n) {
 	let base = g.ads[n+1].mul(tickmul.pow(g.adps[n+1])).div(n===0||g.prestige.upgs[2]?1:8);
 	if(g.prestige.upgs[1]) base = base.mul(2);
 	if(n !== 0) return base;
-	if(base.gt(1e20))
+	if(base.gt(D.pow10(softcapStart())))
 		base = base.pow(
-			(E(20).div(base.log10())).pow(softcapPower())
+			(softcapStart().div(base.log10())).pow(softcapPower())
 		);
 	return base;
 }
-function dimcost(n, q=null){
-	if(q === null) q = g.adps[n]
-	return g.adcms[n].pow(q).mul(g.adics[n]);
-}
 function tickpower(){
+	if(g.flunes.gt(0)) return g.flunes.mul(0.05).add(0.3)
 	if(g.prestige.upgs[4]) return E(0.3)
 	else return E(0.25)
 }
-function tickcost(q=g.tick){
-	let tickscale = 1.3
-	if(g.prestige.upgs[3]) tickscale = 1.25
-	if(g.prestige.upgs[5]) tickscale = 1.2
-	return E(10).pow(q.pow(tickscale).mul(2).floor()).mul(100);
+function tickscale(){
+	if(g.flunes.gt(0)) return E(0.8).pow(g.flunes).mul(0.2).add(1.05);
+	if(g.prestige.upgs[5]) return 1.2
+	if(g.prestige.upgs[3]) return 1.25
+	else return 0.3
 }
-
+function tickcost(){
+	return E(10).pow(g.tick.pow(tickscale()).mul(2).floor()).mul(100);
+}
+function dimcost(n){
+	return g.adcms[n].pow(g.adps[n]).mul(g.adics[n]);
+}
+function flunecost(){
+	return E(2).pow(g.flunes.add(1).pow(1.25)).floor()
+}
 function buyad(n) {
 	let cost = dimcost(n);
 	if (g.a.gte(cost)) {
@@ -137,14 +154,23 @@ function buytick() {
 	}
 	return false;
 }
+function buyflune(){
+	let cost = flunecost();
+	if(g.prestige.points.gte(cost)) {
+		g.prestige.points = g.prestige.points.sub(cost);
+		g.flunes = g.flunes.add(1);
+		return true;
+	}
+	return false;
+}
 function pendingPoints(){
 	if(!g.prestige.upgs[8]) return 1;
 	else return g.tick.sub(5)
 }
 function prestigereset(){
-	if(g.prestige.upgs[7]) g.a = g.prestige.times.add(1).pow(2)
-	else g.a = E(1)
-	g.tick = E(0)
+	if(g.prestige.upgs[7]) g.a = g.prestige.times.add(1).pow(2);
+	else g.a = E(1);
+	g.tick = E(0);
 	for (let i = 1; i <= 4; i++) g.ads[i] = E(0);
 	for (let i = 1; i <= 4; i++) g.adps[i] = E(0);
 }
@@ -163,7 +189,7 @@ function buyPUpgrade(n){
 	}
 }
 function scinot(x, p){
-	return x.toPrecision(p).replace('+', '')
+	return x.toPrecision(p)
 }
 function notate(x, p=2){
 	if (g.notation=='sci') return scinot(x,p+1)
@@ -217,6 +243,7 @@ function notate(x, p=2){
 				<button @click="tab = 'dim'" style="background-color: #933;">Structures</button>
 				<button @click="tab = 'opt'" style="background-color: #ccc;">Options</button>
 				<button @click="tab = 'pre'" style="background-color: #33f;" v-if="g.prestige.times>0">Prestige</button>
+				<button @click="tab = 'fln'" style="background-color: #993;" v-if="g.prestige.upgs[8]">Geometry</button>
 			</div>
 			<button v-if="g.tick.gt(6)" @click='prestige' style="background-color: blue;">Prestige for {{ notate(pendingPoints()) }} point{{pendingPoints!==1?'s':''}}!</button>
 		</div>
@@ -292,8 +319,8 @@ function notate(x, p=2){
 				</tr>
 			</table>
 			<br />
-			<div v-if="baseMPS().gt(1e20)">
-				Above 1e20 manifolds per second, manifold production is raised to the power of {{ notate((E(20).div(baseMPS().log10())).pow(softcapPower()), 4) }}
+			<div v-if="baseMPS().gt(D.pow10(softcapStart()))">
+				Above {{ notate(D.pow10(softcapStart())) }} manifolds per second, manifold production is raised to the power of {{ notate((E(softcapStart()).div(baseMPS().log10())).pow(softcapPower()), 4) }}
 			</div>
 		</div>
 		<br /> 
@@ -330,11 +357,9 @@ function notate(x, p=2){
 					</tr>
 				</table>
 				<br />
-				<textarea v-model="saveinput"></textarea>
+				<textarea id="saveworks"></textarea>
 
 				<br />
-				<button @click="bleh = !bleh">show save or something</button>
-				<div v-if="bleh">{{ JSON.stringify(g) }}</div>
 			</div>
 		</div>
 		<br />
@@ -380,7 +405,7 @@ function notate(x, p=2){
 				<tr>
 					<td>
 						<button :style='{"background-color": g.prestige.upgs[7]?"#33f":"#333"}'
-						@click="buyPUpgrade(7)">Upgrade 7: Start with some manifolds after prestige (currently {{ g.prestige.times.add(1).pow(2) }})</button>
+						@click="buyPUpgrade(7)">Upgrade 7: Start with some manifolds after prestige (currently {{ notate(g.prestige.times.add(1).pow(2)) }})</button>
 					</td>
 					<td>
 						<button :style='{"background-color": g.prestige.upgs[8]?"#33f":"#333"}'
@@ -391,6 +416,20 @@ function notate(x, p=2){
 			<br />
 			<br />
 			<button @click="prestigereset">Force a prestige reset</button>
+		</div>
+		<div v-if="tab==='fln'">
+			You have a {{ g.flunes.add(3) }} dimensional geometry.
+			<br />
+			Extrude into a new dimension:
+			<button @click="buyflune">
+				Cost: {{ notate(flunecost()) }} prestige points
+			</button>
+			<br />
+			They make your theorem scaling {{ notate(tickscale()) }},
+			your theorem power {{ notate(tickpower()) }},
+			your softcap power {{ notate(softcapPower()) }},
+			and your softcap start {{ notate(D.pow10(softcapStart())) }}.
+			If you have 4 dimensions, you will have autobuyers for points, lines, planes, and cells.
 		</div>
 	</div>
 </template>
