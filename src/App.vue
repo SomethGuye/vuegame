@@ -61,11 +61,11 @@ function importSave(){
 function gameTick(t=dTime){
 	if(g.flunes.gte(1)) {
 		for(let i = 1; i <= 4; i++){
-			let bruple = g.a.log10().sub(g.adics[i].log10()).div(g.adcms[i].log10()).add(1);
-			// g.a.div(E(10).pow(2))
+			let bruple = g.a.log10().sub(g.adics[i].log10()).div(g.adcms[i].log10());
 			g.ads[i] = D.max(bruple, g.ads[i]);
 			g.adps[i] = D.max(bruple, g.adps[i]);
 		}
+		g.tick = g.a.log10().sub(2).div(2).pow(E(1).div(tickscale()));
 	}
 	g.a      = g.a     .plus(persec(0).mul(t));
 	g.ads[1] = g.ads[1].plus(persec(1).mul(t));
@@ -97,16 +97,17 @@ function baseMPS(){
 	return g.ads[1].mul(tickmul.pow(g.adps[1])).div(8);
 }
 function softcapStart(){
-	return g.flunes.add(20);
+	return g.flunes.pow(1.5).add(20);
 }
 function softcapPower(){
-	if(g.flunes.gt(0)) return E(0.8).pow(g.flunes).mul(0.25).add(0.2);
+	if(g.flunes.gt(0)) return E(0.95).pow(g.flunes).mul(0.25).add(0.2);
 	if(g.prestige.upgs[6]) return E(0.45)
 	else return E(0.5)
 }
 function persec(n) {
 	let tickmul = g.tick.mul(tickpower()).plus(2);
 	let base = g.ads[n+1].mul(tickmul.pow(g.adps[n+1])).div(n===0||g.prestige.upgs[2]?1:8);
+	if(g.flunes.gt(0)) base = base.mul(g.prestige.points.pow(E(0.5).mul(g.flunes)))
 	if(g.prestige.upgs[1]) base = base.mul(2);
 	if(n !== 0) return base;
 	if(base.gt(D.pow10(softcapStart())))
@@ -124,7 +125,7 @@ function tickscale(){
 	if(g.flunes.gt(0)) return E(0.8).pow(g.flunes).mul(0.2).add(1.05);
 	if(g.prestige.upgs[5]) return 1.2
 	if(g.prestige.upgs[3]) return 1.25
-	else return 0.3
+	else return 1.3
 }
 function tickcost(){
 	return E(10).pow(g.tick.pow(tickscale()).mul(2).floor()).mul(100);
@@ -429,7 +430,8 @@ function notate(x, p=2){
 			your theorem power {{ notate(tickpower()) }},
 			your softcap power {{ notate(softcapPower()) }},
 			and your softcap start {{ notate(D.pow10(softcapStart())) }}.
-			If you have 4 dimensions, you will have autobuyers for points, lines, planes, and cells.
+			If you have 4 dimensions, everything before prestige gets automated.
+			They are also multiplying producers by prestige points^{{ notate(E(0.5).mul(g.flunes)) }}. 
 		</div>
 	</div>
 </template>
