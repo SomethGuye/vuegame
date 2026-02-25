@@ -32,23 +32,34 @@ const base = {
 			false,false,
 			false,false,
 			false,false,
-		]
+		],
+		autobuy: E(Infinity),
+		autobuyon: false
 	},
 	flunes: E(0),
-	notation: 'sci',
 };
 let g = reactive(base);
 const tab = ref("dim");
-let saveloop;
 const dTime = 62.5 / 1000;
+let hardcap = F("e9e15")
 onMounted(()=>{
+	addEventListener("keydown", (ev)=>{
+			if(ev.code === "Digit1") buyad(1)
+			if(ev.code === "Digit2") buyad(2)
+			if(ev.code === "Digit3") buyad(3)
+			if(ev.code === "Digit4") buyad(4)
+			if(ev.code === "KeyT") buytick()
+			if(ev.code === "KeyP") prestige()
+			if(ev.code === "KeyD") buyflune()
+		}	
+	)
 	if(!localStorage.getItem("save")){
 		saveGame();
 	} else {
 		loadGame();
 	}
 	setInterval(gameTick, dTime * 1000);
-	saveloop = setInterval(saveGame, 15_000);
+	setInterval(saveGame, 15_000);
 	}
 );
 function exportSave(){
@@ -58,7 +69,8 @@ function importSave(){
 	localStorage.setItem("save", document.getElementById("saveworks").value);
 	loadGame();
 }
-function gameTick(t=dTime){
+function gameTick(){
+	let t = dTime;
 	if(g.flunes.gte(1)) {
 		let bruple = g.a.log10().sub(g.adics[1].log10()).div(g.adcms[1].log10());
 		g.ads[1] = D.max(bruple, g.ads[1]);
@@ -82,12 +94,16 @@ function gameTick(t=dTime){
 	if(g.flunes.gte(5)){
 		g.tick = g.a.log10().sub(2).div(2).pow(E(1).div(tickscale()));
 	}
-	if(g.a.gte(E(2).pow(1024)) && !false) {
-		g.a = E(2).pow(1024);
-	} else g.a = g.a.plus(persec(0).mul(t));
+	let bloftsap = g.a.plus(persec(0).mul(t))
+	if(bloftsap.gte(hardcap) && !false) {
+		g.a = hardcap;
+	} else g.a = bloftsap;
 	g.ads[1] = g.ads[1].plus(persec(1).mul(t));
 	g.ads[2] = g.ads[2].plus(persec(2).mul(t));
 	g.ads[3] = g.ads[3].plus(persec(3).mul(t));
+	if(pendingPoints().gte(g.prestige.autobuy) && g.flunes.gte(6) && g.prestige.autobuyon) {
+		prestige()
+	}
 }
 function loadGame(){
 	let q = JSON.parse(atob(localStorage.getItem("save")))
@@ -101,24 +117,24 @@ function loadGame(){
 	g.prestige.points = F(g.prestige.points)
 	g.prestige.times = F(g.prestige.times)
 	g.flunes = F(g.flunes);
+	g.prestige.autobuy = F(g.prestige.autobuy)
 }
 function saveGame(){
 	localStorage.setItem("save", btoa(JSON.stringify(g)));
 }
 function delSave(){
 	localStorage.removeItem("save");
-	clearInterval(saveloop);
 	location.reload();
 }
 function baseMPS(){
 	let tickmul = g.tick.mul(tickpower()).plus(2);
-	return g.ads[1].mul(tickmul.pow(g.adps[1])).div(8);
+	return g.ads[1].mul(tickmul.pow(g.adps[1]));
 }
 function softcapStart(){
 	return g.flunes.pow(1.5).add(20);
 }
 function softcapPower(){
-	if(g.flunes.gt(0)) return E(0.95).pow(g.flunes).mul(0.25).add(0.2);
+	if(g.flunes.gt(0)) return E(0.97).pow(g.flunes).mul(0.25).add(0.2);
 	if(g.prestige.upgs[6]) return E(0.45)
 	else return E(0.5)
 }
@@ -128,7 +144,7 @@ function persec(n) {
 	if(g.flunes.gt(0) && g.prestige.points.gt(1)) base = base.mul(g.prestige.points.pow(E(0.5).mul(g.flunes)))
 	if(g.prestige.upgs[1]) base = base.mul(2);
 	if(n !== 0) return base;
-	if(g.a.gte(E(2).pow(1024))) return E(0);
+	if(g.a.gte(hardcap)) return E(0);
 	if(base.gt(D.pow10(softcapStart())))
 		base = base.pow(
 			(softcapStart().div(base.log10())).pow(softcapPower())
@@ -136,12 +152,12 @@ function persec(n) {
 	return base;
 }
 function tickpower(){
-	if(g.flunes.gt(0)) return g.flunes.mul(0.05).add(0.3)
+	if(g.flunes.gt(0)) return g.flunes.mul(0.03125).add(0.3)
 	if(g.prestige.upgs[4]) return E(0.3)
 	else return E(0.25)
 }
 function tickscale(){
-	if(g.flunes.gt(0)) return E(0.8).pow(g.flunes).mul(0.2).add(1.05);
+	if(g.flunes.gt(0)) return E(0.875).pow(g.flunes).mul(0.2).add(1.05);
 	if(g.prestige.upgs[5]) return 1.2
 	if(g.prestige.upgs[3]) return 1.25
 	else return 1.3
@@ -153,7 +169,7 @@ function dimcost(n){
 	return g.adcms[n].pow(g.adps[n]).mul(g.adics[n]);
 }
 function flunecost(){
-	return E(2).pow(g.flunes.add(1).pow(1.25)).floor()
+	return E(2).pow(g.flunes.add(1).pow(1.125)).floor()
 }
 function buyad(n) {
 	let cost = dimcost(n);
@@ -184,7 +200,7 @@ function buyflune(){
 	return false;
 }
 function pendingPoints(){
-	if(!g.prestige.upgs[8]) return 1;
+	if(!g.prestige.upgs[8]) return E(1);
 	else return g.tick.sub(6)
 }
 function prestigereset(){
@@ -195,9 +211,17 @@ function prestigereset(){
 	for (let i = 1; i <= 4; i++) g.adps[i] = E(0);
 }
 function prestige(){
-	g.prestige.points = g.prestige.points.add(pendingPoints());
-	g.prestige.times = g.prestige.times.add(1);
-	prestigereset();
+	if(g.tick.gt(6)) {
+		g.prestige.points = g.prestige.points.add(pendingPoints());
+		g.prestige.times = g.prestige.times.add(1);
+		prestigereset();
+	}
+}
+function setPrestigeAutobuyer(){
+	let buyer = F(document.getElementById("prestigeautobuyer").value)
+	if(buyer !== "NaN") {
+		g.prestige.autobuy = buyer;
+	}
 }
 function buyPUpgrade(n){
 	if(( g.prestige.upgs[n-2] || n <= 2 )&& // if previous
@@ -208,12 +232,32 @@ function buyPUpgrade(n){
 		g.prestige.points = g.prestige.points.sub(1)
 	}
 }
-function scinot(x, p){
-	return x.toPrecision(p)
+function notate(x) { 
+	let j = new Decimal(x)
+	let output = ""
+	let r = j.abs()
+	if(r.lt(100)) {
+		output = r.toFixed(2)
+	} else if (r.lt(1000)) {
+		output = r.toFixed(1)
+	} else if (r.lt(1e6)) {
+		output = r.toFixed(0)
+	} else if (r.lt("e10000")) {
+		output = basenum(r, 2)
+	} else if (r.lt("e1e6")) {
+		output = basenum(r,1)
+	} else if (r.lt("ee10000")) {
+		output = "e" + basenum(r.log10(), 2)
+	} else if (r.lt("ee1e6")) {
+		output = "e" + basenum(r.log10(), 1)
+	}
+	return j.lt(0)?'-':'' + output
 }
-function notate(x, p=2){
-	if (g.notation=='sci') return scinot(x,p+1).replace('+', '')
-	else return 'no notation'
+
+function basenum(x, p) {
+	let exponent = x.log10().floor();
+	let mantissa = x.div(Decimal.pow10(exponent));
+	return mantissa.toFixed(p)+"e"+exponent.toFixed(0)
 }
 </script>
 <style>
@@ -260,16 +304,16 @@ function notate(x, p=2){
 			<div v-if="g.prestige.times > 0">You have <span style="color: #00f;">{{ notate(g.prestige.points) }}</span> prestige points.</div>
 			<br />
 			<div>
-				<button @click="tab = 'dim'" style="background-color: #933;">Structures</button>
+				<button @click="tab = 'dim'" style="background-color: #933;">Producers</button>
 				<button @click="tab = 'opt'" style="background-color: #ccc;">Options</button>
 				<button @click="tab = 'pre'" style="background-color: #33f;" v-if="g.prestige.times>0">Prestige</button>
 				<button @click="tab = 'fln'" style="background-color: #993;" v-if="g.prestige.upgs[8]">Geometry</button>
 			</div>
 			<div>
-				<button v-if="g.tick.gt(6)" @click='prestige' style="background-color: blue;">
-					Prestige for {{ notate(pendingPoints()) }} point{{pendingPoints!==1?'s':''}}!
+				<button v-if="g.tick.gt(6)" @click='prestige' style="background-color: #33f;">
+					Prestige for {{ notate(pendingPoints()) }} point{{pendingPoints()!==1?'s':''}}!
 				</button>
-				<button v-if='g.a.gte(E(2).pow(1024))' @click='alert("Nyi :(")' style="background-color: mediumaquamarine">
+				<button v-if='g.a.gte(E(2).pow(1024))' style="background-color: mediumaquamarine">
 					You won! Click here to make nothing happen
 				</button>
 			</div>	
@@ -280,7 +324,7 @@ function notate(x, p=2){
 					Cost: {{notate(tickcost())}}
 				</button>
 				<pre> </pre>
-				You have {{notate(g.tick)}} theorem{{ g.tick.neq(1)?'s':'' }}<span v-if="g.tick.gt(0)">, making per-purchase multipliers {{notate(g.tick.mul(tickpower()).plus(2), 2)}}</span>
+				You have {{notate(g.tick)}} theorem{{ g.tick.neq(1)?'s':'' }}<span v-if="g.tick.gt(0)">, making per-purchase multipliers {{notate(g.tick.mul(tickpower()).plus(2))}}</span>
 			</div>
 			<br />
 			<table>
@@ -350,10 +394,9 @@ function notate(x, p=2){
 				Above {{ notate(D.pow10(softcapStart())) }} manifolds per second, manifold production is raised to the power of {{ notate((E(softcapStart()).div(baseMPS().log10())).pow(softcapPower()), 4) }}
 			</div>
 			<div v-if="g.a.gte(E(2).pow(1024))">
-				Manifolds are hardcapped at {{ notate(E(2).pow(1024)) }}.
+				Manifolds are hardcapped at {{ notate(hardcap) }}.
 			</div>
 		</div>
-		<br /> 
 		<div v-if="tab==='opt'">
 			<div class="center">
 				<table class="prestige">
@@ -392,7 +435,6 @@ function notate(x, p=2){
 				<br />
 			</div>
 		</div>
-		<br />
 		<div v-if="tab==='pre'">
 			You have <span style="color: #00f">{{ notate(g.prestige.points) }}</span> prestige points.
 			<br />
@@ -459,8 +501,14 @@ function notate(x, p=2){
 			your theorem power {{ notate(tickpower()) }},
 			your softcap power {{ notate(softcapPower()) }},
 			and your softcap start {{ notate(D.pow10(softcapStart())) }}.
-			Each dimension automates a mechanic in this order: Points, Lines, Planes, Cells, and Theorems.
-			They are also multiplying producers by prestige points^{{ notate(E(0.5).mul(g.flunes)) }}. 
+			Each dimension automates a mechanic in this order: Points, Lines, Planes, Cells, Theorems, and Prestige.
+			They are also multiplying producers by prestige points^{{ notate(E(0.5).mul(g.flunes)) }}.
+			<br />
+			<div v-if="g.flunes.gte(6)">
+				<input type="checkbox" v-model="g.prestige.autobuyon" />
+				<input id="prestigeautobuyer" />
+				<button @click="setPrestigeAutobuyer">Set prestige autobuyer</button>
+			</div>
 		</div>
 	</div>
 </template>
