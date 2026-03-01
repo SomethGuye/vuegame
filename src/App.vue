@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import Decimal from './break_eternity.min.js'
+import merge from 'lodash/merge'
 let D = Decimal;
 let E = D.fromNumber;
 let F = D.fromString;
@@ -33,10 +34,11 @@ const base = {
 			false,false,
 			false,false,
 		],
-		autobuy: E(Infinity),
+		autobuy: E(1),
 		autobuyon: false
 	},
 	flunes: E(0),
+	ver: 1
 };
 let g = reactive(base);
 const tab = ref("dim");
@@ -68,6 +70,21 @@ function exportSave(){
 function importSave(){
 	localStorage.setItem("save", document.getElementById("saveworks").value);
 	loadGame();
+}
+function loadGame(){
+	let q = JSON.parse(atob(localStorage.getItem("save")))
+	merge(g,q)
+	g.a = F(g.a);
+	g.tick = F(g.tick)
+	for (let i = 1; i <= 4; i++) g.ads[i] = F(g.ads[i]);
+	for (let i = 1; i <= 4; i++) g.adps[i] = F(g.adps[i]);
+	for (let i = 1; i <= 4; i++) g.adcms[i] = F(g.adcms[i]);
+	for (let i = 1; i <= 4; i++) g.adics[i] = F(g.adics[i]);
+	g.prestige.points = F(g.prestige.points)
+	g.prestige.times = F(g.prestige.times)
+	g.flunes = F(g.flunes);
+	
+	g.prestige.autobuy = F(g.prestige.autobuy)
 }
 function gameTick(){
 	let t = dTime;
@@ -104,20 +121,6 @@ function gameTick(){
 	if(pendingPoints().gte(g.prestige.autobuy) && g.flunes.gte(6) && g.prestige.autobuyon) {
 		prestige()
 	}
-}
-function loadGame(){
-	let q = JSON.parse(atob(localStorage.getItem("save")))
-	Object.assign(g,q);
-	g.a = F(g.a);
-	g.tick = F(g.tick)
-	for (let i = 1; i <= 4; i++) g.ads[i] = F(g.ads[i]);
-	for (let i = 1; i <= 4; i++) g.adps[i] = F(g.adps[i]);
-	for (let i = 1; i <= 4; i++) g.adcms[i] = F(g.adcms[i]);
-	for (let i = 1; i <= 4; i++) g.adics[i] = F(g.adics[i]);
-	g.prestige.points = F(g.prestige.points)
-	g.prestige.times = F(g.prestige.times)
-	g.flunes = F(g.flunes);
-	g.prestige.autobuy = F(g.prestige.autobuy)
 }
 function saveGame(){
 	localStorage.setItem("save", btoa(JSON.stringify(g)));
@@ -324,7 +327,7 @@ function basenum(x, p) {
 					Cost: {{notate(tickcost())}}
 				</button>
 				<pre> </pre>
-				You have {{notate(g.tick)}} theorem{{ g.tick.neq(1)?'s':'' }}<span v-if="g.tick.gt(0)">, making per-purchase multipliers {{notate(g.tick.mul(tickpower()).plus(2))}}</span>
+				You have {{notate(g.tick)}} theorem<span v-if="g.tick.gt(0)">, making per-purchase multipliers {{notate(g.tick.mul(tickpower()).plus(2))}}</span>
 			</div>
 			<br />
 			<table>
@@ -391,7 +394,7 @@ function basenum(x, p) {
 			</table>
 			<br />
 			<div v-if="baseMPS().gt(D.pow10(softcapStart()))">
-				Above {{ notate(D.pow10(softcapStart())) }} manifolds per second, manifold production is raised to the power of {{ notate((E(softcapStart()).div(baseMPS().log10())).pow(softcapPower()), 4) }}
+				Above {{ notate(D.pow10(softcapStart())) }} manifolds per second, manifold production is divided by {{ notate(baseMPS().pow(E(1).sub((softcapStart().div(baseMPS().log10())).pow(softcapPower()))), 4) }}
 			</div>
 			<div v-if="g.a.gte(E(2).pow(1024))">
 				Manifolds are hardcapped at {{ notate(hardcap) }}.
