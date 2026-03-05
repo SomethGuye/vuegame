@@ -35,7 +35,10 @@ const base = {
 			false,false,
 		],
 		autobuy: E(1),
-		autobuyon: false
+		autobuyers: [
+			null,
+			false,false,false,false,false,false,
+		]
 	},
 	flunes: E(0),
 	ver: 1
@@ -46,13 +49,36 @@ const dTime = 62.5 / 1000;
 let hardcap = F("e9e15")
 onMounted(()=>{
 	addEventListener("keydown", (ev)=>{
-			if(ev.code === "Digit1") buyad(1)
-			if(ev.code === "Digit2") buyad(2)
-			if(ev.code === "Digit3") buyad(3)
-			if(ev.code === "Digit4") buyad(4)
-			if(ev.code === "KeyT") buytick()
-			if(ev.code === "KeyP") prestige()
-			if(ev.code === "KeyD") buyflune()
+			let a=ev.getModifierState("Alt")
+			if(ev.code === "Digit1") {
+				if(!a) buyAD(1)
+				else g.prestige.autobuyers[1] = !g.prestige.autobuyers[1]
+			}
+			if(ev.code === "Digit2") {
+				if(!a) buyAD(2)
+				else g.prestige.autobuyers[2] = !g.prestige.autobuyers[2]
+			}
+			if(ev.code === "Digit3") {
+				if(!a) buyAD(3)
+				else g.prestige.autobuyers[3] = !g.prestige.autobuyers[3]
+			}
+			if(ev.code === "Digit4") {
+				if(!a) buyAD(4)
+				else g.prestige.autobuyers[4] = !g.prestige.autobuyers[4]
+			}
+			if(ev.code === "KeyT") {
+				if(!a) buyTick(5)
+				else g.prestige.autobuyers[5] = !g.prestige.autobuyers[5]
+			}
+			if(ev.code === "KeyP") {
+				if(!a) prestige(6)
+				else g.prestige.autobuyers[6] = !g.prestige.autobuyers[6]
+			}
+			if(ev.code === "KeyD") {
+				buyFlune()
+			}
+			
+			if(a)event.preventDefault();
 		}	
 	)
 	if(!localStorage.getItem("save")){
@@ -88,28 +114,44 @@ function loadGame(){
 }
 function gameTick(){
 	let t = dTime;
-	if(g.flunes.gte(1)) {
-		let bruple = g.a.log10().sub(g.adics[1].log10()).div(g.adcms[1].log10());
+	if(g.flunes.gte(1) && g.prestige.autobuyers[1]) {
+		let bruple = g.a.log10()
+			.sub(g.adics[1].log10())
+			.div(g.adcms[1].log10())
+			.ceil();
 		g.ads[1] = D.max(bruple, g.ads[1]);
 		g.adps[1] = D.max(bruple, g.adps[1]);
 	}
-	if(g.flunes.gte(2)){
-		let bruple = g.a.log10().sub(g.adics[2].log10()).div(g.adcms[2].log10());
+	if(g.flunes.gte(2) && g.prestige.autobuyers[2]){
+		let bruple = g.a.log10()
+			.sub(g.adics[2].log10())
+			.div(g.adcms[2].log10())
+			.ceil();
 		g.ads[2] = D.max(bruple, g.ads[2]);
 		g.adps[2] = D.max(bruple, g.adps[2]);
 	}
-	if(g.flunes.gte(3)){
-		let bruple = g.a.log10().sub(g.adics[3].log10()).div(g.adcms[3].log10());
+	if(g.flunes.gte(3) && g.prestige.autobuyers[3]){
+		let bruple = g.a.log10()
+			.sub(g.adics[3].log10())
+			.div(g.adcms[3].log10())
+			.ceil();
 		g.ads[3] = D.max(bruple, g.ads[3]);
 		g.adps[3] = D.max(bruple, g.adps[3]);
 	}
-	if(g.flunes.gte(4)){
-		let bruple = g.a.log10().sub(g.adics[4].log10()).div(g.adcms[4].log10());
+	if(g.flunes.gte(4) && g.prestige.autobuyers[4]){
+		let bruple = g.a.log10()
+			.sub(g.adics[4].log10())
+			.div(g.adcms[4].log10())
+			.ceil();
 		g.ads[4] = D.max(bruple, g.ads[4]);
 		g.adps[4] = D.max(bruple, g.adps[4]);
 	}
-	if(g.flunes.gte(5)){
-		g.tick = g.a.log10().sub(2).div(2).pow(E(1).div(tickscale()));
+	if(g.flunes.gte(5) && g.prestige.autobuyers[5]){
+		g.tick = D.max(g.tick,
+			g.a.log10()
+			.sub(2).div(2)
+			.pow(E(1).div(tickscale())).ceil()
+		);
 	}
 	let bloftsap = g.a.plus(persec(0).mul(t))
 	if(bloftsap.gte(hardcap) && !false) {
@@ -118,7 +160,7 @@ function gameTick(){
 	g.ads[1] = g.ads[1].plus(persec(1).mul(t));
 	g.ads[2] = g.ads[2].plus(persec(2).mul(t));
 	g.ads[3] = g.ads[3].plus(persec(3).mul(t));
-	if(pendingPoints().gte(g.prestige.autobuy) && g.flunes.gte(6) && g.prestige.autobuyon) {
+	if(pendingPoints().gte(g.prestige.autobuy) && g.flunes.gte(6) && g.prestige.autobuyers[6]) {
 		prestige()
 	}
 }
@@ -134,10 +176,10 @@ function baseMPS(){
 	return g.ads[1].mul(tickmul.pow(g.adps[1]));
 }
 function softcapStart(){
-	return g.flunes.pow(1.5).add(20);
+	return g.flunes.pow(2).add(20)
 }
 function softcapPower(){
-	if(g.flunes.gt(0)) return E(0.97).pow(g.flunes).mul(0.25).add(0.2);
+	if(g.flunes.gt(0)) return E(0.99).pow(g.flunes).mul(0.25).add(0.2);
 	if(g.prestige.upgs[6]) return E(0.45)
 	else return E(0.5)
 }
@@ -150,17 +192,17 @@ function persec(n) {
 	if(g.a.gte(hardcap)) return E(0);
 	if(base.gt(D.pow10(softcapStart())))
 		base = base.pow(
-			(softcapStart().div(base.log10())).pow(softcapPower())
+			new D(softcapStart()).div(base.log10()).pow(softcapPower())
 		);
 	return base;
 }
 function tickpower(){
-	if(g.flunes.gt(0)) return g.flunes.mul(0.03125).add(0.3)
+	if(g.flunes.gt(0)) return g.flunes.mul(0.02).add(0.3)
 	if(g.prestige.upgs[4]) return E(0.3)
 	else return E(0.25)
 }
 function tickscale(){
-	if(g.flunes.gt(0)) return E(0.875).pow(g.flunes).mul(0.2).add(1.05);
+	if(g.flunes.gt(0)) return E(0.9).pow(g.flunes).mul(0.2).add(1.05);
 	if(g.prestige.upgs[5]) return 1.2
 	if(g.prestige.upgs[3]) return 1.25
 	else return 1.3
@@ -174,7 +216,7 @@ function dimcost(n){
 function flunecost(){
 	return E(2).pow(g.flunes.add(1).pow(1.125)).floor()
 }
-function buyad(n) {
+function buyAD(n) {
 	let cost = dimcost(n);
 	if (g.a.gte(cost)) {
 		g.a = g.a.sub(cost);
@@ -184,7 +226,7 @@ function buyad(n) {
 	}
 	return false;
 }
-function buytick() {
+function buyTick() {
 	let cost = tickcost();
 	if (g.a.gte(cost)) {
 		g.a = g.a.sub(cost);
@@ -193,7 +235,7 @@ function buytick() {
 	}
 	return false;
 }
-function buyflune(){
+function buyFlune(){
 	let cost = flunecost();
 	if(g.prestige.points.gte(cost)) {
 		g.prestige.points = g.prestige.points.sub(cost);
@@ -253,7 +295,7 @@ function notate(x) {
 		output = "e" + basenum(r.log10(), 2)
 	} else if (r.lt("ee1e6")) {
 		output = "e" + basenum(r.log10(), 1)
-	}
+	} else output = r.toString()
 	return j.lt(0)?'-':'' + output
 }
 
@@ -316,24 +358,20 @@ function basenum(x, p) {
 				<button v-if="g.tick.gt(6)" @click='prestige' style="background-color: #33f;">
 					Prestige for {{ notate(pendingPoints()) }} point{{pendingPoints()!==1?'s':''}}!
 				</button>
-				<button v-if='g.a.gte(E(2).pow(1024))' style="background-color: mediumaquamarine">
-					You won! Click here to make nothing happen
-				</button>
 			</div>	
 		</div>
 		<div v-if="tab==='dim'">
 			<div class="center" v-if="g.ads[1].gt(0)">
-				<button @click="buytick" style = "background-color: #cfc;">
+				<button @click="buyTick" style = "background-color: #cfc;">
 					Cost: {{notate(tickcost())}}
 				</button>
-				<pre> </pre>
-				You have {{notate(g.tick)}} theorem<span v-if="g.tick.gt(0)">, making per-purchase multipliers {{notate(g.tick.mul(tickpower()).plus(2))}}</span>
+				You have {{notate(g.tick)}} theorems<span v-if="g.tick.gt(0)">, making per-purchase multipliers {{notate(g.tick.mul(tickpower()).plus(2))}}</span>
 			</div>
 			<br />
 			<table>
 				<tr>
 					<td>
-						<button @click="buyad(1)">
+						<button @click="buyAD(1)">
 							Cost: {{notate(dimcost(1))}}
 						</button>
 					</td>
@@ -348,9 +386,9 @@ function basenum(x, p) {
 						<span v-if="g.ads[2]>0">| (+{{notate(persec(1))}}/s)</span>
 					</td>
 				</tr>
-				<tr v-if="g.adps[1]>0">
+				<tr v-if="g.ads[1]>0">
 					<td>
-						<button @click="buyad(2)">
+						<button @click="buyAD(2)">
 							Cost: {{notate(dimcost(2))}}
 						</button>
 					</td>
@@ -365,9 +403,9 @@ function basenum(x, p) {
 						<span v-if="g.ads[3]>0">| (+{{notate(persec(2))}}/s)</span>
 					</td>
 				</tr>
-				<tr v-if="g.adps[2]>0">
+				<tr v-if="g.ads[2]>0">
 					<td>
-						<button @click="buyad(3)">
+						<button @click="buyAD(3)">
 							Cost: {{notate(dimcost(3))}}
 						</button>
 					</td>
@@ -382,9 +420,9 @@ function basenum(x, p) {
 						<span v-if="g.ads[4]>0">| (+{{notate(persec(3))}}/s)</span>
 					</td>
 				</tr>
-				<tr v-if="g.adps[3]>0">
+				<tr v-if="g.ads[3]>0">
 					<td>
-						<button @click="buyad(4)">
+						<button @click="buyAD(4)">
 							Cost: {{notate(dimcost(4))}}
 						</button>
 					</td>
@@ -396,7 +434,7 @@ function basenum(x, p) {
 			<div v-if="baseMPS().gt(D.pow10(softcapStart()))">
 				Above {{ notate(D.pow10(softcapStart())) }} manifolds per second, manifold production is divided by {{ notate(baseMPS().pow(E(1).sub((softcapStart().div(baseMPS().log10())).pow(softcapPower()))), 4) }}
 			</div>
-			<div v-if="g.a.gte(E(2).pow(1024))">
+			<div v-if="g.a.gte(hardcap)">
 				Manifolds are hardcapped at {{ notate(hardcap) }}.
 			</div>
 		</div>
@@ -496,7 +534,7 @@ function basenum(x, p) {
 			You have a {{ g.flunes.add(3) }} dimensional geometry.
 			<br />
 			Extrude into a new dimension:
-			<button @click="buyflune">
+			<button @click="buyFlune">
 				Cost: {{ notate(flunecost()) }} prestige points
 			</button>
 			<br />
@@ -507,10 +545,30 @@ function basenum(x, p) {
 			Each dimension automates a mechanic in this order: Points, Lines, Planes, Cells, Theorems, and Prestige.
 			They are also multiplying producers by prestige points^{{ notate(E(0.5).mul(g.flunes)) }}.
 			<br />
+			<div v-if="g.flunes.gte(1)">
+				<input type="checkbox" v-model="g.prestige.autobuyers[1]" />
+				Point Autobuyer
+			</div>
+			<div v-if="g.flunes.gte(2)">
+				<input type="checkbox" v-model="g.prestige.autobuyers[2]" />
+				Line Autobuyer
+			</div>
+			<div v-if="g.flunes.gte(3)">
+				<input type="checkbox" v-model="g.prestige.autobuyers[3]" />
+				Plane Autobuyer
+			</div>
+			<div v-if="g.flunes.gte(4)">
+				<input type="checkbox" v-model="g.prestige.autobuyers[4]" />
+				Cell Autobuyer
+			</div>
+			<div v-if="g.flunes.gte(5)">
+				<input type="checkbox" v-model="g.prestige.autobuyers[5]" />
+				Theorem Autobuyer
+			</div>
 			<div v-if="g.flunes.gte(6)">
-				<input type="checkbox" v-model="g.prestige.autobuyon" />
-				<input id="prestigeautobuyer" />
-				<button @click="setPrestigeAutobuyer">Set prestige autobuyer</button>
+				<input type="checkbox" v-model="g.prestige.autobuyers[6]" />
+				Prestige Autobuyer
+				<input id="prestigeautobuyer" @change="setPrestigeAutobuyer"/>
 			</div>
 		</div>
 	</div>
